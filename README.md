@@ -13,7 +13,7 @@ Minecraft proxy to fake chat and tab menu
 ###### Or
 Download the .zip folder and extract it.
 
-3. Install python modules by running ```pip install <module>``` this includes installing [quarry](https://github.com/barneygale/quarry).
+3. Install python modules by running ```pip install -r requirements.txt```
 
 4. Run ```proxy.py``` and follow log in prompts.
 5. Once ```Waiting for connection...``` appears open your minecraft client and connect to ```localhost:25565```.

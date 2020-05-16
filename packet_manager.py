@@ -79,11 +79,26 @@ def handle(bridge, buff, direction, name):
     # if name in ignore_list:
     #     return
 
+
+
     if direction == "downstream":
+
+        if bridge.antispam:
+            if name == "chat_message":
+                buff.save()
+                if sum([x in buff.read() for x in [b'discord.gg']]) != 0:
+                    return
+                buff.restore()
+
+
+        if not bridge.logPackets : return
         if name in ["player_info", "player_list_item", "player_list_header_footer", "chat_message"]:
             buff.save()
             bridge.packets.append((time.time(), name, buff.read()))
             buff.restore()
+    else:
+        if name == "chat_message":
+            pass
 
 
 

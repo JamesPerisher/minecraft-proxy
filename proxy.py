@@ -2,6 +2,7 @@ from twisted.internet import reactor, defer
 from quarry.net.proxy import DownstreamFactory, Bridge
 
 from quarry.net.auth import Profile
+from quarry.types.buffer import BufferUnderrun
 
 
 import packet_manager
@@ -10,10 +11,13 @@ import time
 
 
 HELP_MSG = """§a!/phelp                Show this message
+§a!/begin                Begin logging packets
 §a!/save                 Save all previouse chat and tab packets to file
 §a!/playback <filename>  Playback packest from file
 §a!/rl                   Reload and terminate packet playback
-§a!/quiet                Mute/Unmute chat"""
+§a!/quiet                Mute/Unmute chat
+§a!/spam                 Ignore/Show chat spam"""
+
 
 print("Log into mojang:")
 EMAIL, PASSWORD = input("email > "), input("Password > ")
@@ -23,7 +27,18 @@ print("Waiting for connection...")
 class QuietBridge(Bridge):
     quiet_mode = False
     count = 0
+    logPackets = False
     packets = []
+    antispam = False
+
+    def packet_received(self, buff, direction, name):
+        try:
+            dispatched = self.dispatch((direction, name), buff)
+
+            if not dispatched:
+                self.packet_unhandled(buff, direction, name)
+        except BufferUnderrun:
+            pass
 
     def packet_upstream_chat_message(self, buff):
         client_command = False
@@ -38,7 +53,12 @@ class QuietBridge(Bridge):
         elif chat_message.startswith("/phelp"):
             self.downstream.send_packet("chat_message", self.write_chat(HELP_MSG, "downstream"))
 
+        elif chat_message.startswith("/begin"):
+            self.logPackets = True
+            self.downstream.send_packet("chat_message", self.write_chat("§a!Begining logging packet", "downstream"))
+
         elif chat_message.startswith("/save"):
+            self.logPackets = False
             fname = "packet_log-%s.txt"%(str(time.time()).split(".")[0])
             with open(fname, "a") as f:
                 while len(self.packets) != 0:
@@ -61,10 +81,16 @@ class QuietBridge(Bridge):
             importlib.reload(packet_manager)
             self.downstream.send_packet("chat_message", self.write_chat("§a!Reloaded module", "downstream"))
 
+        elif chat_message.startswith("/spam"):
+            self.antispam = not self.antispam
+
+            action = self.antispam and "enabled" or "disabled"
+            msg = "§a!Antispam mode %s" % action
+            self.downstream.send_packet("chat_message", self.write_chat(msg, "downstream"))
+
 
         elif chat_message.startswith("/quiet"):
             client_command = True
-            # Switch mode
             self.quiet_mode = not self.quiet_mode
 
             action = self.quiet_mode and "enabled" or "disabled"
@@ -140,6 +166,8 @@ class QuietBridge(Bridge):
         self.count += 1
 
 
+
+
         packet_manager.handle(self, buff, direction, name)
 
 
@@ -153,9 +181,6 @@ class QuietBridge(Bridge):
     def connect(self):
 
         self.upstream_profile = yield Profile.from_credentials(EMAIL, PASSWORD)
-
-        # token = ""
-        # self.upstream_profile = yield Profile.from_token(client_token, token, display_name, uuid)
 
 
         self.upstream_factory = self.upstream_factory_class(
@@ -178,11 +203,11 @@ def main():
     # Create factory
     factory = QuietDownstreamFactory()
 
-    factory.connect_host = "9b9t.com"
+    factory.connect_host = "2b2t.org"
     factory.connect_port = 25565
 
     # Listen
-    factory.listen("localhost", 25565)
+    factory.listen("0.0.0.0", 25565)
     reactor.run()
 
 
